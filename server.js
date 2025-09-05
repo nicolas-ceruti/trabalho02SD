@@ -3,6 +3,7 @@ const net = require('net');
 const HOST = '127.0.0.1';
 const PORT = 8080;
 const NUM_CLIENTS = 2; 
+const OFFSET_INICIAL_NS = 30000
 
 const clients = [];
 const clientTimeDiffs = new Map(); 
@@ -42,15 +43,20 @@ const server = net.createServer(socket => {
 
 function startSynchronizationCycle() {
     console.log("\n--- Iniciando novo ciclo de sincronização ---");
-
     clientTimeDiffs.clear();
     
-    console.log("Enviando solicitação de tempo para todos os clientes...");
+    const timeRequestMessage = {
+        type: 'time_request',
+        payload: new Date().toISOString() 
+    };
+
+    const messageString = JSON.stringify(timeRequestMessage);
+
+    console.log(`Enviando solicitação de tempo para os clientes...`);
     clients.forEach(client => {
-        client.write("GET_TIME");
+        client.write(messageString);
     });
 }
-
 function calculateAndSendAdjustments() {
     console.log("\nCalculando a média dos deslocamentos...");
 
@@ -63,6 +69,7 @@ function calculateAndSendAdjustments() {
     });
 
     const averageOffset = totalDiff / timeDiffs.length;
+
     console.log(`Diferenças coletadas (em segundos): [${timeDiffs.map(d => d.toFixed(4)).join(', ')}]`);
     console.log(`Média do deslocamento calculada: ${averageOffset.toFixed(4)}s`);
     
@@ -70,14 +77,22 @@ function calculateAndSendAdjustments() {
         const clientDiff = clientTimeDiffs.get(client);
         if (clientDiff !== undefined) {
             const adjustment = averageOffset - clientDiff;
-            console.log(`Enviando ajuste de ${adjustment.toFixed(4)}s para ${client.remoteAddress}:${client.remotePort}`);
-            client.write(adjustment.toString());
+
+            const adjustmentMessage = {
+                type: 'adjustment',
+                payload: adjustment
+            };
+            
+            const messageString = JSON.stringify(adjustmentMessage);
+
+            console.log(`Enviando ajuste de ${adjustment.toFixed(4)}ms para ${client.remoteAddress}:${client.remotePort}`);
+            client.write(messageString);
         }
     });
-
+   
     console.log("--- Ciclo de sincronização concluído ---\n");
     
-    setTimeout(startSynchronizationCycle, 30000);
+    setTimeout(startSynchronizationCycle, OFFSET_INICIAL_NS);
 }
 
 server.listen(PORT, HOST, () => {

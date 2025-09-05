@@ -5,11 +5,10 @@ const PORT = 8080;
 
 // Simula o relógio local do cliente com um deslocamento aleatório em milissegundos
 // Deslocamento pode ser de -100 a +100 segundos
-const timeOffset = (Math.random() * 200 - 100) * 1000;
+let timeOffset = (Math.random() * 200 - 100) * 1000;
 
-// Função para obter o tempo simulado do cliente
-function getClientTime() {
-    return new Date(Date.now() + timeOffset);
+function getClientTime(serverTime = new Date()) {
+    return new Date(serverTime.getTime() + timeOffset);
 }
 
 const client = new net.Socket();
@@ -19,30 +18,32 @@ client.connect(PORT, HOST, () => {
     console.log(`Meu relógio inicial (simulado): ${getClientTime().toISOString()}`);
 });
 
-
-
 client.on('data', data => {
-    const message = data.toString();
+    const messageString = data.toString();
+    
+    const parsedMessage = JSON.parse(messageString);
 
-    if (message === "GET_TIME") {
-        const serverTimeEstimation = new Date();
-        const clientSimulatedTime = getClientTime();
+    if (parsedMessage.type === 'time_request') {
+        const serverTime = new Date(parsedMessage.payload);
+        const clientTime = getClientTime(serverTime);
 
-        const timeDifference = (clientSimulatedTime.getTime() - serverTimeEstimation.getTime()) / 1000.0;
+        const timeDifference = (clientTime.getTime() - serverTime.getTime()) / 1000.0;
         
-        console.log(`\nServidor solicitou o tempo. Minha diferença é: ${timeDifference.toFixed(4)}s`);
+        console.log(`\nRecebido pedido de tempo do servidor com o timestamp: ${serverTime.toISOString()}`);
+        console.log(`Meu tempo simulado é:         ${clientTime.toISOString()}`);
+        console.log(`Enviando minha diferença: ${timeDifference.toFixed(4)}`);
+        
         client.write(timeDifference.toString());
 
-    } else {
-        const adjustmentSeconds = parseFloat(message);
-        if (!isNaN(adjustmentSeconds)) {
-            console.log(`Recebido ajuste de ${adjustmentSeconds.toFixed(4)} segundos.`);
-            
-            const adjustmentMilliseconds = adjustmentSeconds * 1000;
-            global.timeOffset += adjustmentMilliseconds;
+    } else if (parsedMessage.type === 'adjustment') {
+        const adjustmentSeconds = parsedMessage.payload;
+        
+        console.log(`\nRecebido ajuste de ${adjustmentSeconds.toFixed(4)} milissegundos.`);
+        
+        const adjustmentMilliseconds = adjustmentSeconds * 1000;
+        timeOffset += adjustmentMilliseconds;
 
-            console.log(`Relógio ajustado para: ${getClientTime().toISOString()}`);
-        }
+        console.log(`Relógio ajustado`);
     }
 });
 

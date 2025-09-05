@@ -1,6 +1,9 @@
 
 # Berkeley Clock Synchronization Algorithm / Algoritmo de Sincronização de Relógios de Berkeley
 
+##  Autores
+Nicolas Andrei Ceruti, Gustavo Henrique Campestrini, Felipe Augusto Giovanella, Julia Welter
+
 ## 🇧🇷 Português
 
 ### Descrição do Projeto
